@@ -1,7 +1,0 @@
-sounddevice>=0.4.6
-numpy>=1.24
-scipy>=1.10
-soundfile>=0.12
-openai-whisper
-pyttsx3>=2.90
-openwakeword>=0.6.0
