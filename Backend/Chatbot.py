@@ -1,5 +1,5 @@
 from groq import Groq  # Importing the Groq library to use its API.
-from json import load, dump, JSONDecodeError  # Importing functions to read and write JSON files.
+from json import load, dump, JSONDecodeError  # Importing functions to read and write JSON files safely.
 import datetime  # Importing the datetime module for real-time date and time information.
 from dotenv import dotenv_values  # Importing dotenv_values to read environment variables from a .env file.
 
@@ -29,14 +29,17 @@ SystemChatBot = [
     {"role": "system", "content": System}
 ]
 
+# Cross-platform file path definition (macOS, Linux, Windows)
+CHAT_LOG_PATH = "Data/ChatLog.json"
+
 # Attempt to load or initialize the chat log safely.
 try:
-    with open("Data/ChatLog.json", "r") as f:
+    with open(CHAT_LOG_PATH, "r") as f:
         messages = load(f)  # Load existing messages from the chat log.
 except (FileNotFoundError, JSONDecodeError):
     # If file doesn't exist or is empty/corrupt, initialize with an empty array.
     messages = []
-    with open("Data/ChatLog.json", "w") as f:
+    with open(CHAT_LOG_PATH, "w") as f:
         dump([], f, indent=4)
 
 # Function to get real-time date and time information.
@@ -70,7 +73,7 @@ def ChatBot(Query):
     try:
         # Safely load existing chat log (using "r" mode).
         try:
-            with open("Data/ChatLog.json", "r") as f:
+            with open(CHAT_LOG_PATH, "r") as f:
                 messages = load(f)
         except (FileNotFoundError, JSONDecodeError):
             messages = []
@@ -91,10 +94,16 @@ def ChatBot(Query):
 
         Answer = ""  # Initialize an empty string to store the AI's response.
 
-        # Process the streamed response chunks.
+        print("\nAssistant: ", end="", flush=True)
+
+        # Stream chunks directly to terminal for instant word-by-word feedback.
         for chunk in completion:
-            if chunk.choices[0].delta.content:  # Check if there's content in the current chunk.
-                Answer += chunk.choices[0].delta.content  # Append the content to the answer.
+            if chunk.choices[0].delta.content:  
+                content = chunk.choices[0].delta.content
+                Answer += content  
+                print(content, end="", flush=True)
+
+        print("\n")  # Newline after stream finishes
 
         Answer = Answer.replace("</s>", "")  # Clean up any unwanted tokens from the response.
 
@@ -102,30 +111,29 @@ def ChatBot(Query):
         messages.append({"role": "assistant", "content": Answer})
 
         # Save the updated chat log back using write mode ("w").
-        with open("Data/ChatLog.json", "w") as f:
+        with open(CHAT_LOG_PATH, "w") as f:
             dump(messages, f, indent=4)
 
         # Return the formatted response.
         return AnswerModifier(Answer=Answer)
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"\nError: {e}")
 
         # In case of an exception, safely reset the log using write mode ("w").
-        with open("Data/ChatLog.json", "w") as f:
+        with open(CHAT_LOG_PATH, "w") as f:
             dump([], f, indent=4)
 
         return "Sorry, an error occurred while processing your request."
 
 # Main program entry point.
-# Main program entry point.
 if __name__ == "__main__":
     while True:
         user_input = input("Enter Your Question: ")
         
-        # Stop loop if the user types exit, quit, or stop
+        # Stop loop if the user types exit, quit, stop, or bye
         if user_input.lower().strip() in ["exit", "quit", "stop", "bye"]:
             print("Goodbye!")
             break
             
-        print(ChatBot(user_input))
+        ChatBot(user_input)
