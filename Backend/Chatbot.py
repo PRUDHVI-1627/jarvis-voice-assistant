@@ -31,11 +31,11 @@ SystemChatBot = [
 
 # Attempt to load the chat log from a JSON file.
 try:
-    with open(r"Data\ChatLog.json", "r") as f:
+    with open("Data/ChatLog.json", "r") as f:
         messages = load(f)  # Load existing messages from the chat log.
 except FileNotFoundError:
     # If the file doesn't exist, create an empty JSON file to store chat logs.
-    with open(r"Data\ChatLog.json", "w") as f:
+    with open("Data/ChatLog.json", "r") as f:
         dump([], f)
 
 # Function to get real-time date and time information.
@@ -68,7 +68,7 @@ def ChatBot(Query):
 
     try:
         # Load the existing chat log from the JSON file.
-        with open(r"Data\ChatLog.json", "r") as f:
+        with open("Data/ChatLog.json", "r") as f:
             messages = load(f)
 
         # Append the user's query to the messages list.
@@ -99,7 +99,7 @@ def ChatBot(Query):
         messages.append({"role": "assistant", "content": Answer})
 
         # Save the updated chat log to the JSON file.
-        with open(r"Data\ChatLog.json", "w") as f:
+        with open("Data/ChatLog.json", "r") as f:
             dump(messages, f, indent=4)
 
         # Return the formatted response.
@@ -108,7 +108,7 @@ def ChatBot(Query):
     except Exception as e:
         print(f"Error: {e}")
 
-        with open(r"Data\ChatLog.json", "w") as f:
+        with open("Data/ChatLog.json", "r") as f:
             dump([], f, indent=4)
 
         return "Sorry, an error occurred while processing your request."
