@@ -39,37 +39,32 @@ You will decide whether a query is a 'general' query, a 'realtime' query, or is 
 *** Respond with 'general (query)' if you can't decide the kind of query or if a query is asking to perform a task which is not mentioned above. ***
 """
 
-# Define chat history for context
+# Predefined chat history for context
 ChatHistory = [
-    {"role": "user", "content": "how are you?"},
-    {"role": "assistant", "content": "general how are you?"},
-    {"role": "user", "content": "do you like pizza?"},
-    {"role": "assistant", "content": "general do you like pizza?"},
-    {"role": "user", "content": "open chrome and tell me about mahatma gandhi."},
-    {"role": "assistant", "content": "open chrome, general tell me about mahatma gandhi."},
-    {"role": "user", "content": "open chrome and firefox"},
-    {"role": "assistant", "content": "open chrome, open firefox"},
-    {"role": "user", "content": "what is today's date and by the way remind me that i have a dancing performance on 5th aug at 11pm"},
-    {"role": "assistant", "content": "general what is today's date, reminder 11:00pm 5th aug dancing performance"},
-    {"role": "user", "content": "chat with me."},
-    {"role": "assistant", "content": "general chat with me."}
+    {"role": "User", "message": "how are you?"},
+    {"role": "Chatbot", "message": "general how are you?"},
+    {"role": "User", "message": "do you like pizza?"},
+    {"role": "Chatbot", "message": "general do you like pizza?"},
+    {"role": "User", "message": "open chrome and tell me about mahatma gandhi."},
+    {"role": "Chatbot", "message": "open chrome, general tell me about mahatma gandhi."},
+    {"role": "User", "message": "open chrome and firefox"},
+    {"role": "Chatbot", "message": "open chrome, open firefox"},
+    {"role": "User", "message": "what is today's date and by the way remind me that i have a dancing performance on 5th aug at 11pm"},
+    {"role": "Chatbot", "message": "general what is today's date, reminder 11:00pm 5th aug dancing performance"},
+    {"role": "User", "message": "chat with me."},
+    {"role": "Chatbot", "message": "general chat with me."}
 ]
 
 # Main decision-making function
 def FirstLayerDMM(prompt: str = "test"):
     try:
-        # Construct messages payload for Cohere API
-        messages_payload = [
-            {"role": "system", "content": preamble}
-        ] + ChatHistory + [
-            {"role": "user", "content": prompt}
-        ]
-
-        # Call Cohere Streaming API
+        # Call Cohere Streaming API with compatible keyword arguments
         stream = co.chat_stream(
             model='command-r-plus',
-            messages=messages_payload,
-            temperature=0.7
+            message=prompt,
+            temperature=0.7,
+            chat_history=ChatHistory,
+            preamble=preamble
         )
 
         response = ""
@@ -89,7 +84,7 @@ def FirstLayerDMM(prompt: str = "test"):
         for task in response_tasks:
             for func in funcs:
                 if task.startswith(func):
-                    filtered_tasks.append(task)  # Add valid task to filtered list
+                    filtered_tasks.append(task)
 
         return filtered_tasks if filtered_tasks else [f"general {prompt}"]
 
