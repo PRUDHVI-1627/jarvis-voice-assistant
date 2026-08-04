@@ -1,5 +1,5 @@
 from groq import Groq  # Importing the Groq library to use its API.
-from json import load, dump  # Importing functions to read and write JSON files.
+from json import load, dump, JSONDecodeError  # Importing functions to read and write JSON files.
 import datetime  # Importing the datetime module for real-time date and time information.
 from dotenv import dotenv_values  # Importing dotenv_values to read environment variables from a .env file.
 
@@ -29,14 +29,15 @@ SystemChatBot = [
     {"role": "system", "content": System}
 ]
 
-# Attempt to load the chat log from a JSON file.
+# Attempt to load or initialize the chat log safely.
 try:
     with open("Data/ChatLog.json", "r") as f:
         messages = load(f)  # Load existing messages from the chat log.
-except FileNotFoundError:
-    # If the file doesn't exist, create an empty JSON file to store chat logs.
-    with open("Data/ChatLog.json", "r") as f:
-        dump([], f)
+except (FileNotFoundError, JSONDecodeError):
+    # If file doesn't exist or is empty/corrupt, initialize with an empty array.
+    messages = []
+    with open("Data/ChatLog.json", "w") as f:
+        dump([], f, indent=4)
 
 # Function to get real-time date and time information.
 def RealtimeInformation():
@@ -67,14 +68,16 @@ def ChatBot(Query):
     """ This function sends the user's query to the chatbot and returns the AI's response. """
 
     try:
-        # Load the existing chat log from the JSON file.
-        with open("Data/ChatLog.json", "r") as f:
-            messages = load(f)
+        # Safely load existing chat log (using "r" mode).
+        try:
+            with open("Data/ChatLog.json", "r") as f:
+                messages = load(f)
+        except (FileNotFoundError, JSONDecodeError):
+            messages = []
 
         # Append the user's query to the messages list.
         messages.append({"role": "user", "content": f"{Query}"})
 
-        # Make a request to the Groq API for a response.
         # Make a request to the Groq API for a response.
         completion = client.chat.completions.create(
             model="llama-3.1-8b-instant",  # Specify the AI model to use.
@@ -98,8 +101,8 @@ def ChatBot(Query):
         # Append the chatbot's response to the messages list.
         messages.append({"role": "assistant", "content": Answer})
 
-        # Save the updated chat log to the JSON file.
-        with open("Data/ChatLog.json", "r") as f:
+        # Save the updated chat log back using write mode ("w").
+        with open("Data/ChatLog.json", "w") as f:
             dump(messages, f, indent=4)
 
         # Return the formatted response.
@@ -108,13 +111,21 @@ def ChatBot(Query):
     except Exception as e:
         print(f"Error: {e}")
 
-        with open("Data/ChatLog.json", "r") as f:
+        # In case of an exception, safely reset the log using write mode ("w").
+        with open("Data/ChatLog.json", "w") as f:
             dump([], f, indent=4)
 
         return "Sorry, an error occurred while processing your request."
-    
+
+# Main program entry point.
 # Main program entry point.
 if __name__ == "__main__":
     while True:
-        user_input = input("Enter Your Question: ")  # Prompt the user for a question.
-        print(ChatBot(user_input))  # Call the chatbot function and print its response.
+        user_input = input("Enter Your Question: ")
+        
+        # Stop loop if the user types exit, quit, or stop
+        if user_input.lower().strip() in ["exit", "quit", "stop", "bye"]:
+            print("Goodbye!")
+            break
+            
+        print(ChatBot(user_input))
