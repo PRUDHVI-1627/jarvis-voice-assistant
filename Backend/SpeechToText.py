@@ -6,14 +6,23 @@ from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import dotenv_values
 import os
 import time
+import atexit
 import mtranslate as mt
 
-# Load environment variables from .env
-env_vars = dotenv_values(".env")
+# Base Directories
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_DIR = os.path.join(BASE_DIR, "Data")
+TEMP_DIR = os.path.join(BASE_DIR, "Frontend", "Files")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Load environment variables
+env_vars = dotenv_values(os.path.join(BASE_DIR, ".env"))
 InputLanguage = env_vars.get("InputLanguage", "en")
 
 # Define HTML template for Web Speech API recognition
-HtmlCode = '''<!DOCTYPE html>
+HtmlCode = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
     <title>Speech Recognition</title>
@@ -26,41 +35,34 @@ HtmlCode = '''<!DOCTYPE html>
         const output = document.getElementById('output');
         let recognition;
 
-        function startRecognition() {
+        function startRecognition() {{
             recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = '';
+            recognition.lang = '{InputLanguage}';
             recognition.continuous = true;
 
-            recognition.onresult = function(event) {
+            recognition.onresult = function(event) {{
                 const transcript = event.results[event.results.length - 1][0].transcript;
-                output.textContent += transcript;
-            };
+                output.textContent = transcript;
+            }};
 
-            recognition.onend = function() {
+            recognition.onend = function() {{
                 recognition.start();
-            };
+            }};
             recognition.start();
-        }
+        }}
 
-        function stopRecognition() {
-            if (recognition) {
+        function stopRecognition() {{
+            if (recognition) {{
                 recognition.stop();
-            }
+            }}
             output.innerHTML = "";
-        }
+        }}
     </script>
 </body>
 </html>'''
 
-# Replace language setting dynamically
-HtmlCode = str(HtmlCode).replace("recognition.lang = '';", f"recognition.lang = '{InputLanguage}';")
-
-# Ensure Data folder exists and write Voice.html safely
-current_dir = os.getcwd()
-data_dir = os.path.join(current_dir, "Data")
-os.makedirs(data_dir, exist_ok=True)
-html_file_path = os.path.join(data_dir, "Voice.html")
-
+# Write HTML file safely
+html_file_path = os.path.join(DATA_DIR, "Voice.html")
 with open(html_file_path, "w", encoding="utf-8") as f:
     f.write(HtmlCode)
 
@@ -68,7 +70,7 @@ Link = f"file://{os.path.abspath(html_file_path)}"
 
 # Configure Chrome Headless Options
 chrome_options = Options()
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
 chrome_options.add_argument(f'user-agent={user_agent}')
 chrome_options.add_argument("--use-fake-ui-for-media-stream")
 chrome_options.add_argument("--use-fake-device-for-media-stream")
@@ -79,16 +81,24 @@ chrome_options.add_argument("--allow-file-access-from-files")
 service = Service(ChromeDriverManager().install())
 driver = webdriver.Chrome(service=service, options=chrome_options)
 
-TempDirPath = os.path.join(current_dir, "Frontend", "Files")
-os.makedirs(TempDirPath, exist_ok=True)
+# Ensure driver quits cleanly when script or GUI exits
+def close_driver():
+    try:
+        driver.quit()
+    except Exception:
+        pass
+
+atexit.register(close_driver)
+
 
 def SetAssistantStatus(Status):
     """Write assistant status to file safely."""
     try:
-        with open(os.path.join(TempDirPath, 'Status.data'), "w", encoding='utf-8') as file:
+        with open(os.path.join(TEMP_DIR, 'Status.data'), "w", encoding='utf-8') as file:
             file.write(Status)
-    except Exception as e:
+    except Exception:
         pass
+
 
 def QueryModifier(Query):
     """Format prompt with appropriate punctuation and capitalization."""
@@ -99,7 +109,6 @@ def QueryModifier(Query):
 
     question_words = ["how", "what", "who", "where", "when", "why", "which", "whose", "whom", "can you", "what's", "where's", "how's"]
 
-    # Add question mark or period logically
     if any(new_query.startswith(word) for word in question_words):
         if query_words[-1][-1] in ['.', '?', '!']:
             new_query = new_query[:-1] + "?"
@@ -113,10 +122,12 @@ def QueryModifier(Query):
 
     return new_query.capitalize()
 
+
 def UniversalTranslator(Text):
     """Translate non-English audio to English."""
     english_translation = mt.translate(Text, "en", "auto")
     return english_translation.capitalize()
+
 
 def SpeechRecognition():
     """Captures audio stream output from headless Chrome session."""
@@ -136,17 +147,18 @@ def SpeechRecognition():
                     SetAssistantStatus("Translating ...")
                     return QueryModifier(UniversalTranslator(Text))
 
-            time.sleep(0.1)  # Prevents CPU overload in infinite loop
+            time.sleep(0.1)
         except Exception:
             pass
+
 
 if __name__ == "__main__":
     try:
         while True:
-            Text = SpeechRecognition()
-            if Text:
-                print(f"Recognized: {Text}")
+            recognized_text = SpeechRecognition()
+            if recognized_text:
+                print(f"Recognized: {recognized_text}")
     except KeyboardInterrupt:
         print("\nStopping Speech Recognition...")
     finally:
-        driver.quit()
+        close_driver()

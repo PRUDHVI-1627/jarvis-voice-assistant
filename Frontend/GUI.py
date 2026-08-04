@@ -9,6 +9,7 @@ from PyQt6.QtCore import Qt, QSize, QTimer
 from dotenv import dotenv_values
 import sys
 import os
+import signal
 
 env_vars = dotenv_values(".env")
 Assistantname = env_vars.get("Assistantname", "Jarvis")
@@ -246,10 +247,10 @@ class InitialScreen(QWidget):
         content_layout.setContentsMargins(0, 10, 0, 20)
         content_layout.setSpacing(10)
         
-        # 1. Top Stretch Spacer
+        # 1. Spacer Top
         content_layout.addStretch(1)
         
-        # 2. Enlarged Centered GIF Ring (520x520)
+        # 2. Centered GIF Ring (Enlarged)
         gif_label = QLabel()
         movie = QMovie(GraphicsDirectoryPath('Jarvis.gif'))
         movie.setScaledSize(QSize(520, 520))
@@ -276,7 +277,7 @@ class InitialScreen(QWidget):
         
         content_layout.addWidget(self.icon_label, alignment=Qt.AlignmentFlag.AlignCenter)
         
-        # 5. Bottom Stretch Spacer
+        # 5. Spacer Bottom
         content_layout.addStretch(1)
         
         self.setLayout(content_layout)
@@ -300,8 +301,6 @@ class InitialScreen(QWidget):
             pixmap = QPixmap(path)
             new_pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.icon_label.setPixmap(new_pixmap)
-        else:
-            print(f"Icon missing at: {path}")
 
     def toggle_icon(self, event=None):
         if self.toggled:
@@ -409,8 +408,9 @@ class CustomTopBar(QWidget):
             self.maximize_button.setIcon(self.restore_icon)
 
     def closeWindow(self):
+        # Clean shutdown for background processes & mic listeners
         QApplication.quit()
-        sys.exit(0)
+        os.kill(os.getpid(), signal.SIGTERM)
 
     def mousePressEvent(self, event):
         if self.draggable:

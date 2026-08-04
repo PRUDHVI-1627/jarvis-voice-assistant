@@ -19,24 +19,28 @@ funcs = [
 ]
 
 # Define the preamble that guides the AI model on how to categorize queries.
+# Updated preamble section in Backend/Model.py
 preamble = """
 You are a very accurate Decision-Making Model, which decides what kind of a query is given to you.
-You will decide whether a query is a 'general' query, a 'realtime' query, or is asking to perform any task or automation like 'open facebook, instagram', 'can you write a application and open it in notepad'
+You will decide whether a query is a 'general' query, a 'realtime' query, or is asking to perform any task or automation like 'open facebook, instagram'.
 *** Do not answer any query, just decide what kind of query is given to you. ***
--> Respond with 'general ( query )' if a query can be answered by a llm model (conversational ai chatbot) and doesn't require any up to date information like if the query is 'who was akbar?' respond with 'general who was akbar?'.
--> Respond with 'realtime ( query )' if a query can not be answered by a llm model (because they don't have realtime data) and requires up to date information like if the query is 'who is indian prime minister' respond with 'realtime who is indian prime minister'.
--> Respond with 'open (application name or website name)' if a query is asking to open any application like 'open facebook', 'open telegram', etc.
--> Respond with 'close (application name)' if a query is asking to close any application like 'close notepad', 'close facebook', etc.
--> Respond with 'play (song name)' if a query is asking to play any song like 'play afsanay by ys', 'play let her go', etc.
--> Respond with 'generate image (image prompt)' if a query is requesting to generate a image with given prompt.
--> Respond with 'reminder (datetime with message)' if a query is requesting to set a reminder.
--> Respond with 'system (task name)' if a query is asking to mute, unmute, volume up, volume down, etc.
--> Respond with 'content (topic)' if a query is asking to write any type of content.
--> Respond with 'google search (topic)' if a query is asking to search a specific topic on google.
--> Respond with 'youtube search (topic)' if a query is asking to search a specific topic on youtube.
-*** If the query is asking to perform multiple tasks like 'open facebook, telegram and close whatsapp' respond with 'open facebook, open telegram, close whatsapp' ***
-*** If the user is saying goodbye or wants to end the conversation like 'bye jarvis.' respond with 'exit'.***
-*** Respond with 'general (query)' if you can't decide the kind of query or if a query is asking to perform a task which is not mentioned above. ***
+
+-> Respond with 'realtime ( query )' if a query asks about ANY specific individual, celebrity, public figure, sports personality, company, news event, or real-time info. Examples:
+   - 'who is elon musk' -> 'realtime who is elon musk'
+   - 'who is virat kohli' -> 'realtime who is virat kohli'
+   - 'what is today's news' -> 'realtime what is today's news'
+
+-> Respond with 'general ( query )' ONLY if the query is purely conversational, mathematical, educational concepts, or standard greetings. Examples:
+   - 'how are you' -> 'general how are you'
+   - 'what is photosynthesis' -> 'general what is photosynthesis'
+   - 'solve 2+2' -> 'general solve 2+2'
+
+-> Respond with 'open (application name)' for opening apps.
+-> Respond with 'close (application name)' for closing apps.
+-> Respond with 'play (song name)' for playing music.
+-> Respond with 'generate image (prompt)' for generating images.
+-> Respond with 'system (task)' for volume/system controls.
+*** If the user is saying goodbye respond with 'exit'. ***
 """
 
 # Predefined chat history for context
@@ -60,7 +64,7 @@ def FirstLayerDMM(prompt: str = "test"):
     try:
         # Call Cohere Streaming API with compatible keyword arguments
         stream = co.chat_stream(
-            model='command-r-plus',
+            model='command-r-08-2024',
             message=prompt,
             temperature=0.7,
             chat_history=ChatHistory,
