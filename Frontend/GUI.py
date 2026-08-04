@@ -13,10 +13,13 @@ import os
 env_vars = dotenv_values(".env")
 Assistantname = env_vars.get("Assistantname", "Jarvis")
 
-# --- Cross-Platform Path Handling ---
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TempDirPath = os.path.join(BASE_DIR, "Frontend", "Files")
-GraphicsDirPath = os.path.join(BASE_DIR, "Frontend", "Graphics")
+# --- Bulletproof Cross-Platform Path Handling ---
+GUI_FILE_PATH = os.path.abspath(__file__)
+FRONTEND_DIR = os.path.dirname(GUI_FILE_PATH)
+PROJECT_ROOT = os.path.dirname(FRONTEND_DIR)
+
+TempDirPath = os.path.join(FRONTEND_DIR, "Files")
+GraphicsDirPath = os.path.join(FRONTEND_DIR, "Graphics")
 
 old_chat_message = ""
 
@@ -94,10 +97,12 @@ def GetAssistantStatus():
 
 def MicButtonInitialed():
     SetMicrophoneStatus("False")
+    SetAssistantStatus("Speaking...")
 
 
 def MicButtonClosed():
     SetMicrophoneStatus("True")
+    SetAssistantStatus("Mute...")
 
 
 def ShowTextToScreen(Text):
@@ -155,7 +160,7 @@ class ChatSection(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.loadMessages)
         self.timer.timeout.connect(self.SpeechRecogText)
-        self.timer.start(5)
+        self.timer.start(50)
         
         self.setStyleSheet("""
             QScrollBar:vertical {
@@ -236,67 +241,78 @@ class InitialScreen(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        screen_geometry = QApplication.primaryScreen().geometry()
-        screen_width = screen_geometry.width()
         
         content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setContentsMargins(0, 10, 0, 20)
+        content_layout.setSpacing(10)
         
+        # 1. Top Stretch Spacer
+        content_layout.addStretch(1)
+        
+        # 2. Enlarged Centered GIF Ring (520x520)
         gif_label = QLabel()
         movie = QMovie(GraphicsDirectoryPath('Jarvis.gif'))
+        movie.setScaledSize(QSize(520, 520))
         gif_label.setMovie(movie)
-        max_gif_size_H = int(screen_width / 16 * 9)
-        movie.setScaledSize(QSize(screen_width, max_gif_size_H))
         gif_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         movie.start()
-        gif_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        content_layout.addWidget(gif_label, alignment=Qt.AlignmentFlag.AlignCenter)
         
+        # 3. Status Text Label ("Speaking...", "Mute...")
+        self.label = QLabel("Speaking...")
+        self.label.setStyleSheet("color: white; font-size: 20px; font-weight: 500; background: transparent;")
+        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        content_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        # 4. Mic Icon Button
         self.icon_label = QLabel()
-        pixmap = QPixmap(GraphicsDirectoryPath('Mic_on.png'))
-        new_pixmap = pixmap.scaled(60, 60)
-        self.icon_label.setPixmap(new_pixmap)
-        self.icon_label.setFixedSize(150, 150)
+        self.icon_label.setFixedSize(65, 65)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.icon_label.setCursor(Qt.CursorShape.PointingHandCursor)
         
         self.toggled = True
         self.toggle_icon()
         self.icon_label.mousePressEvent = self.toggle_icon
         
-        self.label = QLabel("")
-        self.label.setStyleSheet("color: white; font-size:16px; margin-bottom:0;")
-        
-        content_layout.addWidget(gif_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        content_layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
         content_layout.addWidget(self.icon_label, alignment=Qt.AlignmentFlag.AlignCenter)
-        content_layout.setContentsMargins(0, 0, 0, 150)
+        
+        # 5. Bottom Stretch Spacer
+        content_layout.addStretch(1)
         
         self.setLayout(content_layout)
         self.setStyleSheet("background-color: black;")
         
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.SpeechRecogText)
-        self.timer.start(5)
+        self.timer.start(50)
 
     def SpeechRecogText(self):
         try:
             with open(TempDirectoryPath('Status.data'), "r", encoding='utf-8') as file:
                 messages = file.read()
-                self.label.setText(messages)
+                if messages.strip():
+                    self.label.setText(messages)
         except Exception:
             pass
 
-    def load_icon(self, path, width=60, height=60):
-        pixmap = QPixmap(path)
-        new_pixmap = pixmap.scaled(width, height)
-        self.icon_label.setPixmap(new_pixmap)
+    def load_icon(self, path, width=50, height=50):
+        if os.path.exists(path):
+            pixmap = QPixmap(path)
+            new_pixmap = pixmap.scaled(width, height, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.icon_label.setPixmap(new_pixmap)
+        else:
+            print(f"Icon missing at: {path}")
 
     def toggle_icon(self, event=None):
         if self.toggled:
-            self.load_icon(GraphicsDirectoryPath('Mic_on.png'), 60, 60)
+            self.load_icon(GraphicsDirectoryPath('Mic_on.png'), 50, 50)
             MicButtonInitialed()
+            self.label.setText("Speaking...")
         else:
-            self.load_icon(GraphicsDirectoryPath('Mic_off.png'), 60, 60)
+            self.load_icon(GraphicsDirectoryPath('Mic_off.png'), 50, 50)
             MicButtonClosed()
+            self.label.setText("Mute...")
+            
         self.toggled = not self.toggled
 
 
@@ -326,24 +342,25 @@ class CustomTopBar(QWidget):
     def initUI(self):
         self.setFixedHeight(50)
         layout = QHBoxLayout(self)
+        layout.setContentsMargins(15, 0, 15, 0)
         layout.setAlignment(Qt.AlignmentFlag.AlignRight)
         
         home_button = QPushButton()
         home_icon = QIcon(GraphicsDirectoryPath("Home.png"))
         home_button.setIcon(home_icon)
         home_button.setText("  Home")
-        home_button.setStyleSheet("height:40px; line-height:40px; background-color:white; color: black;")
+        home_button.setStyleSheet("height:35px; background-color:white; color: black; padding: 0 10px;")
         
         message_button = QPushButton()
         message_icon = QIcon(GraphicsDirectoryPath("Chats.png"))
         message_button.setIcon(message_icon)
         message_button.setText("  Chat")
-        message_button.setStyleSheet("height:40px; line-height:40px; background-color:white; color: black;")
+        message_button.setStyleSheet("height:35px; background-color:white; color: black; padding: 0 10px;")
         
         minimize_button = QPushButton()
         minimize_icon = QIcon(GraphicsDirectoryPath('Minimize2.png'))
         minimize_button.setIcon(minimize_icon)
-        minimize_button.setStyleSheet("background-color:white;")
+        minimize_button.setStyleSheet("background-color:white; height:35px; width:35px;")
         minimize_button.clicked.connect(self.minimizeWindow)
         
         self.maximize_button = QPushButton()
@@ -351,23 +368,17 @@ class CustomTopBar(QWidget):
         self.restore_icon = QIcon(GraphicsDirectoryPath('Minimize.png'))
         self.maximize_button.setIcon(self.maximize_icon)
         self.maximize_button.setFlat(True)
-        self.maximize_button.setStyleSheet("background-color:white;")
+        self.maximize_button.setStyleSheet("background-color:white; height:35px; width:35px;")
         self.maximize_button.clicked.connect(self.maximizeWindow)
         
         close_button = QPushButton()
         close_icon = QIcon(GraphicsDirectoryPath('Close.png'))
         close_button.setIcon(close_icon)
-        close_button.setStyleSheet("background-color:white;")
+        close_button.setStyleSheet("background-color:white; height:35px; width:35px;")
         close_button.clicked.connect(self.closeWindow)
         
-        line_frame = QFrame()
-        line_frame.setFixedHeight(1)
-        line_frame.setFrameShape(QFrame.Shape.HLine)
-        line_frame.setFrameShadow(QFrame.Shadow.Sunken)
-        line_frame.setStyleSheet("border-color: black;")
-        
         title_label = QLabel(f" {str(Assistantname).capitalize()} AI ")
-        title_label.setStyleSheet("color: black; font-size: 18px; background-color:white;")
+        title_label.setStyleSheet("color: black; font-size: 18px; font-weight: bold; background-color:white; padding: 5px;")
         
         home_button.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(0))
         message_button.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
@@ -380,7 +391,6 @@ class CustomTopBar(QWidget):
         layout.addWidget(minimize_button)
         layout.addWidget(self.maximize_button)
         layout.addWidget(close_button)
-        layout.addWidget(line_frame)
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -399,7 +409,8 @@ class CustomTopBar(QWidget):
             self.maximize_button.setIcon(self.restore_icon)
 
     def closeWindow(self):
-        self.parent().close()
+        QApplication.quit()
+        sys.exit(0)
 
     def mousePressEvent(self, event):
         if self.draggable:
@@ -419,30 +430,28 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        screen_geometry = QApplication.primaryScreen().geometry()
-        screen_width = screen_geometry.width()
-        screen_height = screen_geometry.height()
+        self.resize(1280, 720)
         
-        self.setGeometry(0, 0, screen_width, screen_height)
+        screen = QApplication.primaryScreen().geometry()
+        x = (screen.width() - 1280) // 2
+        y = (screen.height() - 720) // 2
+        self.move(x, y)
+        
         self.setStyleSheet("background-color: black;")
 
-        # Container Widget & Layout
         central_widget = QWidget(self)
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Stacked Widget
         stacked_widget = QStackedWidget(self)
         initial_screen = InitialScreen(self)
         message_screen = MessageScreen(self)
         stacked_widget.addWidget(initial_screen)
         stacked_widget.addWidget(message_screen)
 
-        # Custom Top Bar
         top_bar = CustomTopBar(self, stacked_widget)
 
-        # Add components to layout
         layout.addWidget(top_bar)
         layout.addWidget(stacked_widget)
 
