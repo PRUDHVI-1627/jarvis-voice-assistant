@@ -15,13 +15,15 @@ GroqAPIKey = env_vars.get("GroqAPIKey")
 # Initialize the Groq client with the provided API key.
 client = Groq(api_key=GroqAPIKey)
 
-# Define system message prompt.
-System = f"You are {Assistantname}, an AI assistant for {Username}. Provide helpful answers using web results."
+# Updated system prompt that permits general knowledge if search snippets are limited.
+System = f"""Hello, I am {Username}. You are a very accurate and advanced AI chatbot named {Assistantname}.
+*** Provide Answers In a Professional Way, make sure to add full stops, commas, question marks, and use proper grammar. ***
+*** Answer using the provided search results and real-time information. If search results are empty or incomplete, use your base knowledge to answer fully without mentioning empty search results. ***"""
 
-# Cross-platform file path definition (works on macOS, Linux, and Windows)
+# Cross-platform file path definition (macOS, Linux, Windows)
 CHAT_LOG_PATH = "Data/ChatLog.json"
 
-# Initialize or fix empty chat log safely
+# Safely initialize or clear corrupted chat log
 try:
     with open(CHAT_LOG_PATH, "r") as f:
         messages = load(f)
@@ -30,35 +32,40 @@ except (FileNotFoundError, JSONDecodeError):
     with open(CHAT_LOG_PATH, "w") as f:
         dump([], f, indent=4)
 
-# Function to perform a Google search and format the results.
+# Function to perform Google Search (Reduced to 3 results for speed)
 def GoogleSearch(query):
     try:
-        results = list(search(query, advanced=True, num_results=5))
-        Answer = f"The search results for '{query}' are:\n[start]\n"
+        results = list(search(query, advanced=True, num_results=3))
+        
+        if not results:
+            return f"No search results returned for '{query}'."
 
+        Answer = f"The search results for '{query}' are:\n[start]\n"
         for i in results:
-            Answer += f"Title: {i.title}\nDescription: {i.description}\n\n"
+            title = getattr(i, 'title', 'No Title')
+            description = getattr(i, 'description', 'No Description')
+            url = getattr(i, 'url', '')
+            Answer += f"Title: {title}\nDescription: {description}\nURL: {url}\n\n"
 
         Answer += "[end]"
         return Answer
     except Exception as e:
         return f"Search failed: {e}"
 
-# Function to clean up the answer by removing empty lines.
+# Clean up final string formatting
 def AnswerModifier(Answer):
     lines = Answer.split('\n')
     non_empty_lines = [line for line in lines if line.strip()]
-    modified_answer = '\n'.join(non_empty_lines)
-    return modified_answer
+    return '\n'.join(non_empty_lines)
 
-# Base system prompts
+# System prompt structure
 SystemChatBot = [
     {"role": "system", "content": System},
     {"role": "user", "content": "Hi"},
     {"role": "assistant", "content": "Hello, how can I help you?"}
 ]
 
-# Function to get real-time information like the current date and time.
+# Function to get real-time information like current date and time
 def Information():
     current_date_time = datetime.datetime.now()
     day = current_date_time.strftime("%A")
@@ -70,16 +77,13 @@ def Information():
     second = current_date_time.strftime("%S")
     
     data = "Use This Real-time Information if needed:\n"
-    data += f"Day: {day}\n"
-    data += f"Date: {date}\n"
-    data += f"Month: {month}\n"
-    data += f"Year: {year}\n"
+    data += f"Day: {day}\nDate: {date}\nMonth: {month}\nYear: {year}\n"
     data += f"Time: {hour} hours, {minute} minutes, {second} seconds.\n"
     return data
 
-# Function to handle real-time search and response generation.
+# Fast Realtime Search Engine with live token streaming
 def RealtimeSearchEngine(prompt):
-    # Load existing chat log safely in read mode ("r")
+    # Load chat history safely
     try:
         with open(CHAT_LOG_PATH, "r") as f:
             messages = load(f)
@@ -88,11 +92,10 @@ def RealtimeSearchEngine(prompt):
 
     messages.append({"role": "user", "content": f"{prompt}"})
 
-    # Perform Google search
+    # Perform quick Google search
     search_data = GoogleSearch(prompt)
 
     try:
-        # Construct message payload dynamically (prevents global list corruption)
         messages_payload = (
             SystemChatBot 
             + [{"role": "system", "content": search_data}]
@@ -100,42 +103,49 @@ def RealtimeSearchEngine(prompt):
             + messages
         )
 
+        # High-speed model execution
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # Updated supported model
+            model="llama-3.1-8b-instant",  # Ultra-fast model
             messages=messages_payload,
             temperature=0.7,
-            max_tokens=2048,
+            max_tokens=1024,
             top_p=1,
             stream=True,
             stop=None
         )
         
         Answer = ""
+        print("\nAssistant: ", end="", flush=True)
+
+        # Stream chunks directly to terminal for near-instant response feedback
         for chunk in completion:
             if chunk.choices[0].delta.content:
-                Answer += chunk.choices[0].delta.content
+                content = chunk.choices[0].delta.content
+                Answer += content
+                print(content, end="", flush=True)
+
+        print("\n")  # Newline after streaming completes
 
         Answer = Answer.strip().replace("</s>", "")
         messages.append({"role": "assistant", "content": Answer})
 
-        # Save updated conversation log back using write mode ("w")
+        # Save conversation state
         with open(CHAT_LOG_PATH, "w") as f:
             dump(messages, f, indent=4)
 
         return AnswerModifier(Answer=Answer)
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"\nError: {e}")
         return "Sorry, I ran into an error generating that response."
 
-# Main entry point of the program for interactive querying.
+# Main interactive loop with exit handler
 if __name__ == "__main__":
     while True:
         prompt = input("Enter your query: ")
         
-        # Exit switch to cleanly terminate the program
         if prompt.lower().strip() in ["exit", "quit", "stop", "bye"]:
             print("Goodbye!")
             break
             
-        print(RealtimeSearchEngine(prompt))
+        RealtimeSearchEngine(prompt)
